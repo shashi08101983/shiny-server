@@ -1,0 +1,435 @@
+---
+title: "Untitled"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: fill
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(nycflights13)
+library(DT)
+library(shiny)
+library(ggplot2)
+library(plotly)
+library(maps)
+knitr::opts_chunk$set(message = FALSE)
+library(ggplot2)
+library(plyr)
+
+# Make some noisily increasing data
+set.seed(955)
+dat <- data.frame(cond = rep(c("A", "B"), each=10),
+                  xvar = 1:20 + rnorm(20,sd=3),
+                  yvar = 1:20 + rnorm(20,sd=3))
+
+```
+
+Page1
+===========================================
+rows
+-----------------------------------------------------------------------
+
+### Flights
+
+```{r}
+flights <- 23
+valueBox(flights, icon = "fa-plane")
+
+```
+
+### Deliveries
+
+```{r}
+deliveries <- 410
+valueBox(deliveries, color = "warning", icon = "fa-shopping-cart")
+```
+
+### Rate
+
+```{r}
+rate <- 85
+gauge(rate, min = 0, max = 100, symbol = "%",
+  gaugeSectors(
+    success = c(80, 100),
+    warning = c(40, 79),
+    danger = c(0, 39)
+  )
+)
+```
+
+
+Column
+-----------------------------------------------------------------------
+### Flight table
+
+```{r}
+
+DT::datatable(mtcars, options = list(
+  bPaginate = T, pagelength = 10
+))
+
+```
+
+
+
+Page2
+===========================================
+
+Inputs {.sidebar}
+------------------------------------------------------------------------
+
+```{r}
+checkboxGroupInput("Cyl", "Cylinders",
+                   choices = c("4", "6", "8"),
+                   selected = c("4", "6", "8"),
+                   inline = TRUE
+)
+
+sliderInput("hp", "Horsepower",
+            min = min(mtcars$hp),
+            max = max(mtcars$hp),
+            value = range(mtcars$hp)
+)
+
+```
+
+Outputs
+----------------------------------------------------------------------
+
+### Scatter plot of weight and miles per galon
+
+```{r}
+
+mpg_subset <- reactive({
+  mtcars[mtcars$hp >= input$hp[1] & 
+           mtcars$hp[2]&
+           mtcars$cyl %in% input$Cyl,]
+})
+
+renderPlot({
+  ggplot(mpg_subset(),
+         aes(x=wt, y=mpg, color=factor(cyl)))+
+    geom_point()+
+    coord_cartesian(
+      xlim = range(mtcars$wt,
+      ylim = range(mtcars$mpg))
+    )
+})
+
+
+
+```
+
+
+### Histogram of weight
+
+```{r}
+renderPlot({
+  ggplot(mpg_subset(),
+         aes(x = wt))+
+    geom_histogram()+
+    coord_cartesian(
+      xlim = range(mtcars$wt)
+    )
+})
+
+```
+
+
+column
+---------------------
+
+### Table mtcars
+
+```{r}
+mtcarsReact <- reactive({
+  mpg_subset()
+})
+mtcarsReact
+class(mtcarsReact)
+```
+
+Kmean Clustering 
+===========================================
+```{r global, include=FALSE}
+# load data in 'global' chunk so it can be shared by all users of the dashboard
+library(datasets)
+data(iris)
+```
+
+
+Column {.sidebar}
+-----------------------------------------------------------------------
+
+```{r}
+checkboxGroupInput('xcol', 'X Variable', names(iris))
+    
+selectInput('ycol', 'Y Variable', names(iris),
+                selected=names(iris)[[2]])
+    
+numericInput('clusters', 'Cluster count', 3,
+              min = 1, max = 9)
+```
+
+Column
+-----------------------------------------------------------------------
+
+### K Means
+
+```{r}
+palette(c("#E41A1C", "#377EB8", "#4DAF4A", "#984EA3",
+  "#FF7F00", "#FFFF33", "#A65628", "#F781BF", "#999999"))
+
+# Combine the selected variables into a new data frame
+selectedData <- reactive({
+  iris[, c(input$xcol, input$ycol)]
+})
+
+clusters <- reactive({
+  kmeans(selectedData(), input$clusters)
+})
+
+renderPlot({
+  par(mar = c(5.1, 4.1, 0, 1))
+  plot(selectedData(),
+       col = clusters()$cluster,
+       pch = 20, cex = 3)
+  points(clusters()$centers, pch = 4, cex = 4, lwd = 4)
+})
+```
+
+### Table mtcars
+
+```{r}
+mtcarsReact <- reactive({
+  mpg_subset()
+})
+mtcarsReact
+class(mtcarsReact)
+```
+
+ggplotly_example
+===========================================
+
+
+Row {data-height=600}
+------------------------------------------------------------------------------
+
+<!-- ### Unemployment -->
+
+<!-- ```{r} -->
+<!-- # This example modifies code from Hadley Wickham (https://gist.github.com/hadley/233134) -->
+<!-- # It also uses data from Nathan Yau's flowingdata site (http://flowingdata.com/) -->
+<!-- unemp <- read.csv("http://datasets.flowingdata.com/unemployment09.csv") -->
+<!-- names(unemp) <- c("id", "state_fips", "county_fips", "name", "year",  -->
+<!--                   "?", "?", "?", "rate") -->
+<!-- unemp$county <- tolower(gsub(" County, [A-Z]{2}", "", unemp$name)) -->
+<!-- unemp$state <- gsub("^.*([A-Z]{2}).*$", "\\1", unemp$name) -->
+<!-- county_df <- map_data("county") -->
+<!-- names(county_df) <- c("long", "lat", "group", "order", "state_name", "county") -->
+<!-- county_df$state <- state.abb[match(county_df$state_name, tolower(state.name))] -->
+<!-- county_df$state_name <- NULL -->
+<!-- state_df <- map_data("state") -->
+<!-- choropleth <- merge(county_df, unemp, by = c("state", "county")) -->
+<!-- choropleth <- choropleth[order(choropleth$order), ] -->
+<!-- choropleth$rate_d <- cut(choropleth$rate, breaks = c(seq(0, 10, by = 2), 35)) -->
+
+<!-- # provide a custom tooltip to plotly with the county name and actual rate -->
+<!-- choropleth$text <- with(choropleth, paste0("County: ", name, "<br>Rate: ", rate)) -->
+<!-- p <- ggplot(choropleth, aes(long, lat, group = group)) + -->
+<!--   geom_polygon(aes(fill = rate_d, text = text),  -->
+<!--                colour = alpha("white", 1/2), size = 0.2) +  -->
+<!--   geom_polygon(data = state_df, colour = "white", fill = NA) + -->
+<!--   scale_fill_brewer(palette = "PuRd") + theme_void() -->
+<!-- # just show the text aesthetic in the tooltip -->
+<!-- ggplotly(p, tooltip = "text") -->
+<!-- ``` -->
+
+<!-- ### Crimes -->
+
+<!-- ```{r} -->
+<!-- crimes <- data.frame(state = tolower(rownames(USArrests)), USArrests) -->
+<!-- crimesm <- tidyr::gather(crimes, variable, value, -state) -->
+<!-- states_map <- map_data("state") -->
+<!-- g <- ggplot(crimesm, aes(map_id = state)) + -->
+<!--   geom_map(aes(fill = value), map = states_map) + -->
+<!--   expand_limits(x = states_map$long, y = states_map$lat) + -->
+<!--   facet_wrap( ~ variable) + theme_void() -->
+<!-- ggplotly(g) -->
+<!-- ``` -->
+
+<!-- Row {data-height=400} -->
+<!-- ------------------------------------------------------------------------------ -->
+
+<!-- ### Faithful Eruptions -->
+
+<!-- ```{r} -->
+<!-- m <- ggplot(faithful, aes(x = eruptions, y = waiting)) + -->
+<!--   stat_density_2d() + xlim(0.5, 6) + ylim(40, 110) -->
+<!-- ggplotly(m) -->
+<!-- ``` -->
+
+<!-- ### Faithful Eruptions (polygon) -->
+
+<!-- ```{r} -->
+<!-- m <- ggplot(faithful, aes(x = eruptions, y = waiting)) + -->
+<!--   stat_density_2d(aes(fill = ..level..), geom = "polygon") +  -->
+<!--   xlim(0.5, 6) + ylim(40, 110) -->
+<!-- ggplotly(m) -->
+<!-- ``` -->
+
+<!-- ### Faithful Eruptions (hex) -->
+
+<!-- ```{r} -->
+<!-- m <- ggplot(faithful, aes(x = eruptions, y = waiting)) + geom_hex()  -->
+<!-- ggplotly(m) -->
+<!-- ``` -->
+
+ggplotly_geom
+=========================================
+
+geom_point
+=======================================================================
+
+<!-- Row -->
+<!-- ----------------------------------------------------------------------- -->
+
+<!-- ### Scatter Chart with geom_point -->
+
+<!-- ```{r} -->
+<!-- p <- ggplot(dat, aes(x=xvar, y=yvar)) + -->
+<!--             geom_point(shape=1)      # Use hollow circles -->
+<!-- ggplotly(p) -->
+<!-- ``` -->
+
+
+<!-- ### geom_smooth Linear Regression -->
+
+<!-- ```{r} -->
+<!-- p <- ggplot(dat, aes(x=xvar, y=yvar)) + -->
+<!--             geom_point(shape=1) +    # Use hollow circles -->
+<!--             geom_smooth(method=lm)   # Add linear regression line -->
+<!-- ggplotly(p) -->
+<!-- ``` -->
+
+<!-- Row -->
+<!-- ----------------------------------------------------------------------- -->
+
+<!-- ### geom_smooth with Loess Smoothed Fit -->
+
+<!-- ```{r} -->
+<!-- p <- ggplot(dat, aes(x=xvar, y=yvar)) + -->
+<!--             geom_point(shape=1) +    # Use hollow circles -->
+<!--             geom_smooth()            # Add a loess smoothed fit curve with confidence region -->
+<!-- ggplotly(p) -->
+<!-- ``` -->
+
+<!-- ### Constraining Slope with stat_smooth -->
+
+<!-- ```{r} -->
+<!-- n <- 20 -->
+<!-- x1 <- rnorm(n); x2 <- rnorm(n) -->
+<!-- y1 <- 2 * x1 + rnorm(n) -->
+<!-- y2 <- 3 * x2 + (2 + rnorm(n)) -->
+<!-- A <- as.factor(rep(c(1, 2), each = n)) -->
+<!-- df <- data.frame(x = c(x1, x2), y = c(y1, y2), A = A) -->
+<!-- fm <- lm(y ~ x + A, data = df) -->
+
+<!-- p <- ggplot(data = cbind(df, pred = predict(fm)), aes(x = x, y = y, color = A)) -->
+<!-- p <- p + geom_point() + geom_line(aes(y = pred)) -->
+<!-- ggplotly(p) -->
+<!-- ``` -->
+
+geom_density
+=======================================================================
+
+<!-- Row -->
+<!-- ----------------------------------------------------------------------- -->
+
+<!-- ### stat_density Example -->
+
+<!-- ```{r} -->
+<!-- dfGamma = data.frame(nu75 = rgamma(100, 0.75), -->
+<!--            nu1 = rgamma(100, 1), -->
+<!--            nu2 = rgamma(100, 2)) -->
+
+<!-- dfGamma = stack(dfGamma) -->
+
+<!-- p <- ggplot(dfGamma, aes(x = values)) + -->
+<!--             stat_density(aes(group = ind, color = ind),position="identity",geom="line") -->
+<!-- ggplotly(p) -->
+<!-- ``` -->
+
+<!-- ### Add Conditional Density Curves to Plot -->
+
+<!-- ```{r} -->
+<!-- dim1 <- c(rnorm(100, mean=1), rnorm(100, mean=4)) -->
+<!-- dim2 <- rnorm(200, mean=1) -->
+<!-- cat <- factor(c(rep("a", 100), rep("b", 100))) -->
+<!-- mydf <- data.frame(cbind(dim2, dim1, cat)) -->
+<!-- p <- ggplot(data=mydf, aes(x=dim1, y=dim2, colour=as.factor(cat))) + -->
+<!--   geom_point() + -->
+<!--   stat_density(aes(x=dim1, y=(-2+(..scaled..))), -->
+<!--                position="identity", geom="line") -->
+
+<!-- stuff <- ggplot_build(p) -->
+<!-- xrange <- stuff[[2]]$ranges[[1]]$x.range  # extract the x range to make the -->
+<!--                                           # new densities align with y-axis -->
+
+<!-- ## Get densities of dim2 -->
+<!-- # ds <- do.call(rbind, lapply(unique(mydf$cat), function(lev) { -->
+<!-- #     dens <- with(mydf, density(dim2[cat==lev])) -->
+<!-- #     data.frame(x=dens$y+xrange[1], y=dens$x, cat=lev) -->
+<!-- # })) -->
+<!-- # -->
+<!-- # p <- p + geom_path(data=ds, aes(x=x, y=y, color=factor(cat))) -->
+<!-- # -->
+<!-- # ggplotly(p) -->
+<!-- ``` -->
+
+<!-- Row -->
+<!-- ----------------------------------------------------------------------- -->
+
+<!-- ### geom_density and facet_wrap Together -->
+
+<!-- ```{r} -->
+<!-- dd<-data.frame(matrix(rnorm(144, mean=2, sd=2),72,2),c(rep("A",24),rep("B",24),rep("C",24))) -->
+<!-- colnames(dd) <- c("x_value", "Predicted_value",  "State_CD") -->
+
+<!-- dd <- data.frame( -->
+<!--   predicted = rnorm(72, mean = 2, sd = 2), -->
+<!--   state = rep(c("A", "B", "C"), each = 24) -->
+<!-- ) -->
+
+<!-- grid <- with(dd, seq(min(predicted), max(predicted), length = 100)) -->
+<!-- normaldens <- ddply(dd, "state", function(df) { -->
+<!--   data.frame( -->
+<!--     predicted = grid, -->
+<!--     density = dnorm(grid, mean(df$predicted), sd(df$predicted)) -->
+<!--   ) -->
+<!-- }) -->
+
+<!-- p <- ggplot(dd, aes(predicted))  + -->
+<!--             geom_density() + -->
+<!--             geom_line(aes(y = density), data = normaldens, colour = "red") + -->
+<!--             facet_wrap(~ state) -->
+<!-- ggplotly(p) -->
+<!-- ``` -->
+
+<!-- ### Density and Scatterplot Overlay Using geom_density -->
+
+<!-- ```{r} -->
+<!-- df <- data.frame(x <- rchisq(1000, 10, 10), -->
+<!--                  y <- rnorm(1000)) -->
+
+<!-- p <- ggplot(df, aes(x, y)) + -->
+<!--      geom_point(alpha = 0.5) + -->
+<!--      geom_density_2d() + -->
+<!--      theme(panel.background = element_rect(fill = '#ffffff')) -->
+
+<!-- ggplotly(p) -->
+<!-- ``` -->
+
